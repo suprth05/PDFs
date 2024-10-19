@@ -1,5 +1,6 @@
 import os
 import re
+import tempfile
 import requests
 import streamlit as st
 from dotenv import load_dotenv
@@ -55,34 +56,19 @@ def summarize_chunks(chunks, hf_api_key, max_len, min_len):
         summaries.append(summary)
     return summaries
 
-# Translate text using LibreTranslate
-def translate_text(text, target_language):
-    LIBRETRANSLATE_URL = "http://127.0.0.1:5000"  # Adjust if necessary
-    data = {
-        "q": text,
-        "source": "en",
-        "target": target_language,
-        "format": "text"
-    }
-    response = requests.post(f"{LIBRETRANSLATE_URL}/translate", json=data)
-    if response.status_code == 200:
-        return response.json()["translatedText"]
-    else:
-        raise Exception(f"Failed to get a response from LibreTranslate: {response.status_code}, {response.text}")
-
 # Ensure the audio directory exists
 AUDIO_DIR = "audio_files"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 # Text-to-Speech function with directory storage
-def text_to_speech(text, lang='en'):
-    tts = gTTS(text=text, lang=lang)
-    audio_file_name = os.path.join(AUDIO_DIR, f"summary_{lang}.mp3")  # Save audio as summary_language.mp3
+def text_to_speech(text):
+    tts = gTTS(text=text, lang='en')
+    audio_file_name = os.path.join(AUDIO_DIR, "summary.mp3")  # Save audio as summary.mp3
     tts.save(audio_file_name)
     return audio_file_name  # Return the name of the audio file
 
 def main():
-    st.title("📄 AI PDF Summarizer with Text-to-Voice")
+    st.title("📄 General PDF Summarizer with Text-to-Voice")
     st.write("Created by Team Troupe")
     st.divider()
 
@@ -119,25 +105,11 @@ def main():
         st.subheader('Summary Results:')
         st.write(full_summary)
 
-        # Language selection for translation
-        supported_languages = ["fr", "de", "es", "it", "hi"]  # Add more languages as needed
-        target_language = st.selectbox("Select Language for Translation", supported_languages)
-
-        # Translate the summary to the selected language
-        if st.button('Translate Summary'):
-            translated_summary = translate_text(full_summary, target_language)
-            st.subheader('Translated Summary:')
-            st.write(translated_summary)
-
-            # Add Text-to-Speech functionality for translated summary
-            if st.button('Listen to Translated Summary'):
-                audio_file = text_to_speech(translated_summary, target_language)  # Save to file
-                st.audio(audio_file, format='audio/mp3')  # Play the audio
-
-        # Add Text-to-Speech functionality for original summary
+        # Add Text-to-Speech functionality
         if st.button('Listen to Summary'):
             audio_file = text_to_speech(full_summary)  # Save to file
             st.audio(audio_file, format='audio/mp3')  # Play the audio
 
 if __name__ == '__main__':
     main()
+

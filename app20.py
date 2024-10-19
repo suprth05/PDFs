@@ -55,40 +55,31 @@ def summarize_chunks(chunks, hf_api_key, max_len, min_len):
         summaries.append(summary)
     return summaries
 
+# Translate text using LibreTranslate
+def translate_text(text, target_language):
+    LIBRETRANSLATE_URL = "http://127.0.0.1:5000"  # Adjust if necessary
+    data = {
+        "q": text,
+        "source": "en",
+        "target": target_language,
+        "format": "text"
+    }
+    response = requests.post(f"{LIBRETRANSLATE_URL}/translate", json=data)
+    if response.status_code == 200:
+        return response.json()["translatedText"]
+    else:
+        raise Exception(f"Failed to get a response from LibreTranslate: {response.status_code}, {response.text}")
+
 # Ensure the audio directory exists
 AUDIO_DIR = "audio_files"
 os.makedirs(AUDIO_DIR, exist_ok=True)
 
 # Text-to-Speech function with directory storage
-def text_to_speech(text, lang, file_name):
+def text_to_speech(text, lang='en'):
     tts = gTTS(text=text, lang=lang)
-    audio_file_name = os.path.join(AUDIO_DIR, file_name)
+    audio_file_name = os.path.join(AUDIO_DIR, f"summary_{lang}.mp3")  # Save audio as summary_language.mp3
     tts.save(audio_file_name)
     return audio_file_name  # Return the name of the audio file
-
-# Translate text using local LibreTranslate
-def translate_text(text, target_lang='hi'):
-    api_url = "http://127.0.0.1:5000/translate"
-    data = {
-        'q': text,
-        'source': 'en',
-        'target': target_lang,
-        'format': 'text'
-    }
-    response = requests.post(api_url, json=data)
-    if response.status_code == 200:
-        return response.json()['translatedText']
-    else:
-        raise Exception(f"Failed to get a response from LibreTranslate: {response.status_code}, {response.text}")
-
-# Get list of supported languages from LibreTranslate
-def get_supported_languages():
-    api_url = "http://127.0.0.1:5000/languages"
-    response = requests.get(api_url)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"Failed to get supported languages: {response.status_code}, {response.text}")
 
 def main():
     st.title("📄 AI PDF Summarizer with Text-to-Voice")
@@ -101,23 +92,12 @@ def main():
         st.error(str(e))
         return
 
-    # Get supported languages for translation
-    try:
-        languages = get_supported_languages()
-        language_names = {lang['code']: lang['name'] for lang in languages}
-    except Exception as e:
-        st.error(f"Error fetching supported languages: {str(e)}")
-        return
-
     # Upload the PDF document
     pdf = st.file_uploader('Upload your PDF Document', type='pdf')
 
     # Customizable summary length
     max_len = st.slider('Max Length of Summary', 100, 500, 300)
     min_len = st.slider('Min Length of Summary', 50, 150, 80)
-
-    # Language selection for translation
-    target_language = st.selectbox("Select Language for Translation", list(language_names.keys()), format_func=lambda x: language_names[x])
 
     if pdf is not None:
         pdf_reader = PdfReader(pdf)
@@ -139,24 +119,25 @@ def main():
         st.subheader('Summary Results:')
         st.write(full_summary)
 
+        # Language selection for translation
+        supported_languages = ["fr", "de", "es", "it", "hi"]  # Add more languages as needed
+        target_language = st.selectbox("Select Language for Translation", supported_languages)
+
         # Translate the summary to the selected language
-        try:
-            translated_summary = translate_text(full_summary, target_lang=target_language)
+        if st.button('Translate Summary'):
+            translated_summary = translate_text(full_summary, target_language)
             st.subheader('Translated Summary:')
             st.write(translated_summary)
 
-            # Generate audio for translated summary
+            # Add Text-to-Speech functionality for translated summary
             if st.button('Listen to Translated Summary'):
-                audio_file = text_to_speech(translated_summary, lang=target_language, file_name="translated_summary.mp3")
+                audio_file = text_to_speech(translated_summary, target_language)  # Save to file
                 st.audio(audio_file, format='audio/mp3')  # Play the audio
-        except Exception as e:
-            st.error(f"Translation error: {str(e)}")
 
         # Add Text-to-Speech functionality for original summary
         if st.button('Listen to Summary'):
-            audio_file = text_to_speech(full_summary, lang='en', file_name="summary.mp3")  # Save to file
+            audio_file = text_to_speech(full_summary)  # Save to file
             st.audio(audio_file, format='audio/mp3')  # Play the audio
 
 if __name__ == '__main__':
     main()
-
